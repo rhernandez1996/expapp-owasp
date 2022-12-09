@@ -6,10 +6,20 @@ const express               =  require('express'),
       bodyParser            =  require("body-parser"),
       LocalStrategy         =  require("passport-local"),
       passportLocalMongoose =  require("passport-local-mongoose"),
-      User                  =  require("./models/user")
+      User                  =  require("./models/user"),
+      rateLimit = require("express-rate-limit"),
+      xss = require('xss-clean'),
+      helmet = require('helmet')
 
 //Connecting database
 mongoose.connect("mongodb://localhost/auth_demo");
+
+saveUninitialized:true,
+cookie: {
+    httpOnly: true
+    secure: true
+    maxAge: 1 * 60 * 1000 //10 mins
+}
 
 app.use(expSession({
     secret:"mysecret",       //decode or encode session
@@ -32,9 +42,21 @@ app.use(express.static("public"));
 //=======================
 //      O W A S P
 //=======================
+//Data Sanitization against NoSQL Injection Attacks
+app.use(mongoSanitize());
 
+const limit = rateLimit({
+    max:100, //max requests
+    windowMs: 60 * 60 * 1000, //1 hour of 'Ban' / lockout
+    message: 'Too many requests' //message to send
+});
+app.use('/routeName', limit); //setting limiter on specific route
 
-
+//preventing DOS attacks - Body Parser
+app.use(express.json({ limit: '10kb '})); //body limit is 10
+//data sanitization against xss attacks
+app.use(xss());
+ app.use(helmet());
 //=======================
 //      R O U T E S
 //=======================
